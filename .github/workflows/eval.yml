@@ -1,0 +1,55 @@
+name: EvalOps CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    name: Run LLM eval suite
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start EvalOps API
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+          cp .env.example .env || true
+          echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> .env
+          echo "DATABASE_URL=sqlite:///./evalops.db" >> .env
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
+          sleep 15
+          curl -s http://localhost:8000/health
+
+      - name: Run eval suite
+        id: eval
+        run: |
+          RESPONSE=$(curl -s -X POST http://localhost:8000/api/evaluate \
+            -H "Content-Type: application/json" \
+            -d @examples/demo-suite.json)
+          echo "$RESPONSE" > eval_result.json
+          echo "--- Eval Result ---"
+          python3 -m json.tool eval_result.json
+          ACCURACY=$(python3 -c "import json; print(json.load(open('eval_result.json'))['accuracy'])")
+          THRESHOLD=$(python3 -c "import json; print(json.load(open('eval_result.json'))['threshold'])")
+          echo "accuracy=$ACCURACY" >> $GITHUB_OUTPUT
+          echo "threshold=$THRESHOLD" >> $GITHUB_OUTPUT
+          if python3 -c "import sys; sys.exit(0 if $ACCURACY >= $THRESHOLD else 1)"; then
+            echo "PASS: accuracy $ACCURACY >= threshold $THRESHOLD"
+          else
+            echo "FAIL: accuracy $ACCURACY < threshold $THRESHOLD"
+            exit 1
+          fi
+
+      - name: Upload eval result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-result
+          path: eval_result.json

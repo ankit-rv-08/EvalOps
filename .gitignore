@@ -219,8 +219,7 @@ __marimo__/
 evalops.db
 *.db
 .env
-evalops.db
-*.db
-.env
-evalops.db
-*.db
+
+# Sentence-transformers cache
+.cache/
+sentence_transformers/

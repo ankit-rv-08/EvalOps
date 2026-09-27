@@ -1,0 +1,30 @@
+# Example: How to use EvalOps in your own repo.
+#
+# 1. Add EVALOPS_URL to your repo secrets (e.g. https://evalops.onrender.com)
+# 2. Add your test suite at eval-suite.json in the repo root
+# 3. Copy this file to .github/workflows/eval.yml in your repo
+
+name: LLM Eval
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run EvalOps
+        run: |
+          RESPONSE=$(curl -s -X POST "${{ secrets.EVALOPS_URL }}/api/evaluate" \
+            -H "Content-Type: application/json" \
+            -d @eval-suite.json)
+          echo "$RESPONSE" | python3 -m json.tool
+          ACCURACY=$(echo "$RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['accuracy'])")
+          THRESHOLD=$(echo "$RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['threshold'])")
+          python3 -c "import sys; sys.exit(0 if $ACCURACY >= $THRESHOLD else 1)" || {
+            echo "FAIL: accuracy $ACCURACY < threshold $THRESHOLD"
+            exit 1
+          }
