@@ -4,7 +4,23 @@
 
 FastAPI • Groq • PostgreSQL • SQLAlchemy • sentence-transformers • GitHub Actions
 
----
+[![Live Dashboard](https://img.shields.io/badge/dashboard-live-D4FF3A)](https://evalops-dashboard-chi.vercel.app)
+[![Backend API](https://img.shields.io/badge/api-live-1F1F22)](https://evalops.onrender.com/health)
+[![CI](https://github.com/ankit-rv-08/EvalOps/actions/workflows/eval.yml/badge.svg)](https://github.com/ankit-rv-08/EvalOps/actions/workflows/eval.yml)
+
+## 🔗 Live
+
+| Resource | URL |
+|---|---|
+| Dashboard | https://evalops-dashboard-chi.vercel.app |
+| Backend API | https://evalops.onrender.com |
+| GitHub Action | [.github/workflows/eval.yml](.github/workflows/eval.yml) |
+
+![EvalOps Dashboard](docs/dashboard.png)
+
+![Per-case breakdown with LLM judge reasoning](docs/per-case.png)
+
+![GitHub Actions CI passing](docs/github-actions.png)
 
 ## What it does
 
@@ -12,111 +28,24 @@ EvalOps is CI/CD for AI features. Just like unit tests catch bugs before deploy,
 
 1. You define a test suite (JSON: input + expected output)
 2. EvalOps runs each case against any LLM endpoint
-3. It scores: exact match, contains, semantic similarity, latency, cost
+3. It scores using one of four methods (see below)
 4. Results persist to PostgreSQL
-5. GitHub Action blocks the deploy if accuracy drops below threshold
+5. A GitHub Action blocks the deploy if accuracy drops below threshold
 
----
+## Scoring methods
 
-## Status
+| Method | When to use | How it works |
+|---|---|---|
+| **exact_match** | Short, deterministic outputs | Output stripped + lowercased, compared to expected |
+| **contains** | Keyword checks | Expected appears as a substring in output |
+| **semantic_similarity** | Free-text paraphrases | Local MiniLM embeddings + cosine similarity (threshold default 0.75) |
+| **llm_judge** | Open-ended reasoning | GPT-OSS-120B reads input + expected + output, returns PASS/FAIL + reasoning |
 
-- [x] FastAPI scaffold + PostgreSQL/SQLAlchemy
-- [x] Exact-match + contains scoring
-- [x] Semantic similarity scoring (local MiniLM embeddings)
-- [x] Groq integration (GPT-OSS-120B)
-- [x] `POST /api/evaluate` endpoint
-- [x] `GET /api/runs` and `GET /api/runs/{id}` endpoints
-- [x] Per-case cost + latency tracking
-- [x] GitHub Action for CI/CD
-- [ ] LLM-as-judge scoring
-- [ ] Next.js dashboard
-- [ ] Production deploy (Render + Vercel)
+## CI/CD integration
 
----
+Drop [examples/client-workflow.yml](examples/client-workflow.yml) into your repo. Set `EVALOPS_URL` as a secret. Every PR runs an eval — if accuracy drops, the build fails.
 
-## API
-
-**`GET /health`**
-
-```json
-{"status": "ok", "service": "evalops"}
-```
-
-**`POST /api/evaluate`**
-
-Request:
-```json
-{
-  "suite_name": "test-1",
-  "model": "openai/gpt-oss-120b",
-  "scoring": "exact_match",
-  "threshold": 0.85,
-  "cases": [
-    {"id": "c1", "input": "What is 2+2? Reply with just the number.", "expected": "4"}
-  ]
-}
-```
-
-Response:
-```json
-{
-  "suite_name": "test-1",
-  "model": "openai/gpt-oss-120b",
-  "total_cases": 1,
-  "passed": 1,
-  "accuracy": 1.0,
-  "avg_latency_ms": 763.0,
-  "total_cost_usd": 0.000037,
-  "run_id": 1,
-  "passed_threshold": true,
-  "per_case": [...]
-}
-```
-
-**`GET /api/runs`**
-
-List recent eval runs (summary view):
-
-```json
-{
-  "total": 1,
-  "runs": [
-    {
-      "run_id": 1,
-      "suite_name": "test-1",
-      "model": "openai/gpt-oss-120b",
-      "total_cases": 1,
-      "passed": 1,
-      "accuracy": 1.0,
-      "created_at": "2026-09-27T06:51:39.061389"
-    }
-  ]
-}
-```
-
-**`GET /api/runs/{run_id}`**
-
-Fetch a single run with full per-case breakdown:
-
-```json
-{
-  "run_id": 1,
-  "suite_name": "test-1",
-  "model": "openai/gpt-oss-120b",
-  "total_cases": 1,
-  "passed": 1,
-  "accuracy": 1.0,
-  "per_case": [...]
-}
-```
-
----
-
-## CI/CD Integration
-
-EvalOps is designed to run in CI. Drop the workflow from `examples/client-workflow.yml` into your repo, set `EVALOPS_URL` as a secret, and your PRs will block when LLM quality regresses.
-
-**Self-demo:** See `.github/workflows/eval.yml` — EvalOps tests itself on every PR.
+**Self-demo:** EvalOps tests itself on every push via [.github/workflows/eval.yml](.github/workflows/eval.yml).
 
 ```
 Pull request opened
@@ -125,17 +54,69 @@ Pull request opened
 GitHub Actions runs .github/workflows/eval.yml
 │
 ▼
-Starts EvalOps, hits /api/evaluate with examples/demo-suite.json
+Starts EvalOps, hits /api/evaluate with demo-suite.json
 │
 ▼
 Checks accuracy against threshold (0.7)
 │
 ▼
-Pass → merge allowed
-Fail → PR blocked
+Pass → merge allowed · Fail → PR blocked
 ```
 
----
+## API
+
+**`POST /api/evaluate`** — run a suite
+
+```json
+{
+  "suite_name": "test-1",
+  "model": "openai/gpt-oss-120b",
+  "scoring": "semantic_similarity",
+  "threshold": 0.75,
+  "cases": [
+    {"id": "c1", "input": "What is 2+2?", "expected": "4"}
+  ]
+}
+```
+
+Response includes: `accuracy`, `passed`, `failed`, `avg_latency_ms`, `total_cost_usd`, and `per_case` breakdown with `raw_similarity` or `judge_reason`.
+
+**`GET /api/runs`** — list recent runs
+**`GET /api/runs/{id}`** — full per-case breakdown
+**`GET /health`** — health check
+
+## Status
+
+- ☑ FastAPI + PostgreSQL + SQLAlchemy
+- ☑ Four scoring methods: exact_match, contains, semantic_similarity, llm_judge
+- ☑ Groq integration (GPT-OSS-120B)
+- ☑ Local MiniLM embeddings (no API quota)
+- ☑ Per-case persistence with judge reasoning
+- ☑ Unit tests (18 passing)
+- ☑ GitHub Action CI (self-testing)
+- ☑ Next.js dashboard (live polling every 5s)
+- ☑ Production deploy (Render backend, Vercel dashboard)
+
+## Architecture
+
+```
+Client (dashboard or CI)
+        │
+        ▼
+POST /api/evaluate
+        │
+        ▼
+runner.py ──► Groq GPT-OSS-120B (or any model)
+        │
+        ▼
+scorer.py ──► exact_match / contains / semantic_similarity / llm_judge
+        │
+        ▼
+PostgreSQL (EvalRun + EvalCase rows)
+        │
+        ▼
+GET /api/runs → dashboard renders live
+```
 
 ## Local setup
 
@@ -149,57 +130,9 @@ cp .env.example .env  # add your GROQ_API_KEY
 uvicorn app.main:app --reload --port 8000
 ```
 
----
+## Dashboard
 
-## GitHub Actions Integration
-
-EvalOps includes a GitHub Action that automatically runs eval suites on PRs and blocks deploys if accuracy drops below threshold.
-
-### Self-Test Workflow
-
-The `.github/workflows/eval.yml` workflow runs a demo suite on every PR to main:
-
-```yaml
-name: EvalOps CI
-
-on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-
-jobs:
-  evaluate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Start EvalOps API
-        run: |
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install -r requirements.txt
-          echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> .env
-          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 &
-          sleep 15
-      - name: Run eval suite
-        run: |
-          RESPONSE=$(curl -s -X POST http://localhost:8000/api/evaluate \
-            -H "Content-Type: application/json" \
-            -d @examples/demo-suite.json)
-          # Check if accuracy >= threshold
-```
-
-### Using EvalOps in Your Repo
-
-To use EvalOps in your own repository:
-
-1. Add `EVALOPS_URL` to your repo secrets (e.g., `https://evalops.onrender.com`)
-2. Create your test suite as `eval-suite.json` in your repo root
-3. Add the workflow from `examples/client-workflow.yml` to `.github/workflows/eval.yml`
-
-See `examples/client-workflow.yml` for a complete example.
-
----
+Separate repo: [evalops-dashboard](https://github.com/ankit-rv-08/evalops-dashboard). Consumes `/api/runs` via SWR polling. Deployed on Vercel.
 
 ## License
 
