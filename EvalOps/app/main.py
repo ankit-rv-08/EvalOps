@@ -18,12 +18,4 @@ app = FastAPI(title="EvalOps", lifespan=lifespan)
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "evalops"}
-
-
-def _include_routers():
-    from app.api.evaluate import router as evaluate_router
-    app.include_router(evaluate_router)
-
-
-_include_routers()
     

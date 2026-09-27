@@ -218,3 +218,9 @@ __marimo__/
 .streamlit/secrets.toml
 evalops.db
 *.db
+.env
+evalops.db
+*.db
+.env
+evalops.db
+*.db
