@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.db import get_db, EvalRun
+from app.db import get_db, EvalRun, EvalCase
 from app.eval.runner import run_suite
 
 router = APIRouter()
@@ -31,7 +31,7 @@ def evaluate(suite: TestSuite, db: Session = Depends(get_db)):
 
     result = run_suite(suite.model_dump())
 
-    # Persist to DB
+    # Persist the run
     run = EvalRun(
         suite_name=result["suite_name"],
         model=result["model"],
@@ -45,6 +45,25 @@ def evaluate(suite: TestSuite, db: Session = Depends(get_db)):
     db.add(run)
     db.commit()
     db.refresh(run)
+
+    # Persist each case
+    for case_result in result["per_case"]:
+        db_case = EvalCase(
+            run_id=run.id,
+            case_id=case_result["id"],
+            input=case_result["input"],
+            expected=case_result["expected"],
+            output=case_result["output"],
+            score=case_result["score"],
+            passed=case_result["passed"],
+            latency_ms=case_result["latency_ms"],
+            prompt_tokens=case_result["prompt_tokens"],
+            completion_tokens=case_result["completion_tokens"],
+            cost_usd=case_result["cost_usd"],
+            error=case_result["error"],
+        )
+        db.add(db_case)
+    db.commit()
 
     result["run_id"] = run.id
     result["created_at"] = run.created_at.isoformat()

@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, Column, Integer, String, JSON, Float, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, JSON, Float, DateTime, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./evalops.db")
@@ -27,6 +27,23 @@ class EvalRun(Base):
     avg_latency_ms = Column(Float, default=0.0)
     total_cost_usd = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class EvalCase(Base):
+    __tablename__ = "eval_cases"
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, index=True, nullable=False)
+    case_id = Column(String, nullable=False)
+    input = Column(String, nullable=False)
+    expected = Column(String, nullable=False)
+    output = Column(String, default="")
+    score = Column(Float, default=0.0)
+    passed = Column(Boolean, default=False)
+    latency_ms = Column(Integer, default=0)
+    prompt_tokens = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    cost_usd = Column(Float, default=0.0)
+    error = Column(String, nullable=True)
 
 
 def init_db():

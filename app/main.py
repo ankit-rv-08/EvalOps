@@ -22,7 +22,9 @@ def health():
 
 def _include_routers():
     from app.api.evaluate import router as evaluate_router
+    from app.api.runs import router as runs_router
     app.include_router(evaluate_router)
+    app.include_router(runs_router)
 
 
 _include_routers()
