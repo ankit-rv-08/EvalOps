@@ -67,6 +67,7 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
                 "expected": c.expected,
                 "output": c.output,
                 "score": c.score,
+                "raw_similarity": c.raw_similarity,
                 "passed": c.passed,
                 "latency_ms": c.latency_ms,
                 "prompt_tokens": c.prompt_tokens,

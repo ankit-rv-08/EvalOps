@@ -1,6 +1,6 @@
 """Unit tests for scoring functions."""
 
-from app.eval.scorer import score_exact_match, score_contains, get_scorer
+from app.eval.scorer import score_exact_match, score_contains, score_semantic_similarity, semantic_similarity_raw, get_scorer
 
 
 def test_exact_match_same_string():
@@ -49,3 +49,19 @@ def test_get_scorer_unknown():
     import pytest
     with pytest.raises(ValueError):
         get_scorer("made_up_method")
+
+
+def test_semantic_similarity_empty_strings():
+    assert semantic_similarity_raw("", "test") == 0.0
+    assert semantic_similarity_raw("test", "") == 0.0
+
+
+def test_semantic_similarity_none():
+    assert semantic_similarity_raw(None, "test") == 0.0
+    assert semantic_similarity_raw("test", None) == 0.0
+
+
+def test_get_scorer_semantic():
+    scorer = get_scorer("semantic_similarity")
+    # This would normally call the API, but we're just testing the function lookup
+    assert scorer == score_semantic_similarity
