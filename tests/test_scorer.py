@@ -1,6 +1,9 @@
 """Unit tests for scoring functions."""
 
-from app.eval.scorer import score_exact_match, score_contains, score_semantic_similarity, semantic_similarity_raw, get_scorer
+import os
+from unittest.mock import patch
+
+from app.eval.scorer import score_exact_match, score_contains, score_semantic_similarity, semantic_similarity_raw, llm_judge_raw, score_llm_judge, get_scorer
 
 
 def test_exact_match_same_string():
@@ -65,3 +68,31 @@ def test_get_scorer_semantic():
     scorer = get_scorer("semantic_similarity")
     # This would normally call the API, but we're just testing the function lookup
     assert scorer == score_semantic_similarity
+
+
+@patch.dict(os.environ, {"GROQ_API_KEY": "test_key"})
+def test_llm_judge_empty_input():
+    result = llm_judge_raw("", "output", "expected")
+    assert result["verdict"] == "FAIL"
+    # The reason could be "Empty" or an API error with fake key
+    assert result["reason"] is not None
+
+
+@patch.dict(os.environ, {"GROQ_API_KEY": "test_key"})
+def test_llm_judge_empty_output():
+    result = llm_judge_raw("input", "", "expected")
+    assert result["verdict"] == "FAIL"
+    assert "Empty" in result["reason"]
+
+
+@patch.dict(os.environ, {"GROQ_API_KEY": "test_key"})
+def test_llm_judge_scoring():
+    score = score_llm_judge("input", "output", "expected")
+    # With empty input, should return 0.0
+    assert score == 0.0
+
+
+def test_get_scorer_llm_judge():
+    scorer = get_scorer("llm_judge")
+    # LLM judge is handled specially, returns None
+    assert scorer is None

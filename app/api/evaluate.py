@@ -56,6 +56,7 @@ def evaluate(suite: TestSuite, db: Session = Depends(get_db)):
             output=case_result["output"],
             score=case_result["score"],
             raw_similarity=case_result.get("raw_similarity"),
+            judge_reason=case_result.get("judge_reason"),
             passed=case_result["passed"],
             latency_ms=case_result["latency_ms"],
             prompt_tokens=case_result["prompt_tokens"],

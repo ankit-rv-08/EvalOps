@@ -39,6 +39,7 @@ class EvalCase(Base):
     output = Column(String, default="")
     score = Column(Float, default=0.0)
     raw_similarity = Column(Float, nullable=True)
+    judge_reason = Column(String, nullable=True)
     passed = Column(Boolean, default=False)
     latency_ms = Column(Integer, default=0)
     prompt_tokens = Column(Integer, default=0)

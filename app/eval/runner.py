@@ -6,12 +6,18 @@ from typing import Dict
 
 from groq import Groq
 
-from app.eval.scorer import get_scorer, semantic_similarity_raw
+from app.eval.scorer import (
+    get_scorer,
+    semantic_similarity_raw,
+    llm_judge_raw,
+)
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 COST_PER_1M_INPUT = 0.15
 COST_PER_1M_OUTPUT = 0.60
+JUDGE_COST_PER_1M_INPUT = 0.15
+JUDGE_COST_PER_1M_OUTPUT = 0.60
 
 
 def estimate_cost(prompt_tokens: int, completion_tokens: int) -> float:
@@ -49,14 +55,19 @@ def run_case(
 
     latency_ms = int((time.perf_counter() - start) * 1000)
 
+    raw_similarity = None
+    judge_reason = None
+
     if error:
         score = 0.0
-        raw_similarity = None
     elif scoring_method == "semantic_similarity":
         raw_similarity = semantic_similarity_raw(output, case["expected"])
         score = 1.0 if raw_similarity >= threshold else 0.0
+    elif scoring_method == "llm_judge":
+        judge = llm_judge_raw(case["input"], output, case["expected"])
+        score = 1.0 if judge["verdict"] == "PASS" else 0.0
+        judge_reason = judge["reason"]
     else:
-        raw_similarity = None
         score = scorer(output, case["expected"])
 
     cost = estimate_cost(prompt_tokens, completion_tokens)
@@ -68,6 +79,7 @@ def run_case(
         "output": output,
         "score": score,
         "raw_similarity": raw_similarity,
+        "judge_reason": judge_reason,
         "passed": score >= 1.0,
         "latency_ms": latency_ms,
         "prompt_tokens": prompt_tokens,
